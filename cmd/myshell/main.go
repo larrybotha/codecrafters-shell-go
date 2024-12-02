@@ -30,7 +30,8 @@ func main() {
 
 		switch command {
 		default:
-			fmt.Println("invalid_command: not found")
+			output, _ := fmt.Printf("%s: not found", command)
+			fmt.Fprint(os.Stdout, output)
 		}
 	}
 }
