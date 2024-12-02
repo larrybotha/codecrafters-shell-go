@@ -8,9 +8,6 @@ import (
 	"strings"
 )
 
-// Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
-var _ = fmt.Fprint
-
 func main() {
 	// Uncomment this block to pass the first stage
 	fmt.Fprint(os.Stdout, "$ ")
@@ -27,11 +24,11 @@ func main() {
 
 	if len(inputs) > 0 {
 		command := inputs[0]
+		fmt.Println(command)
 
 		switch command {
 		default:
-			output, _ := fmt.Printf("%s: command not found", command)
-			fmt.Fprintln(os.Stdout, output)
+			fmt.Printf("%s: command not found\n", command)
 		}
 	}
 }
