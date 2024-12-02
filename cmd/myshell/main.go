@@ -22,7 +22,6 @@ func main() {
 
 	if len(inputs) > 0 {
 		command := inputs[0]
-		fmt.Println(command)
 
 		switch command {
 		default:
