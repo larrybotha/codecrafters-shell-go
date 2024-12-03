@@ -11,12 +11,6 @@ import (
 
 type command func([]string)
 
-var builtins = map[string]command{
-	"exit":      handleExit,
-	"echo":      handleEcho,
-	"not_found": handleNotFound,
-}
-
 func main() {
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
@@ -29,23 +23,44 @@ func main() {
 		}
 
 		inputs := strings.Split(strings.TrimSpace(reader), " ")
-		var command string
+		commandName := ""
 
 		if len(inputs) > 0 {
-			command = strings.TrimSpace(inputs[0])
+			commandName = strings.TrimSpace(inputs[0])
 		}
 
-		if command == "" {
+		if commandName == "" {
 			continue
 		}
 
-		builtin, ok := builtins[command]
+		builtinCommand, ok := getBuiltin(commandName)
+
 		if !ok {
-			builtin = builtins["not_found"]
+			handleNotFound(inputs)
+			continue
 		}
 
-		builtin(inputs)
+		builtinCommand(inputs)
 	}
+}
+
+func getBuiltin(commandName string) (command, bool) {
+	var result command
+	ok := false
+
+	switch commandName {
+	case "exit":
+		result = handleExit
+		ok = true
+	case "type":
+		result = handleType
+		ok = true
+	case "echo":
+		result = handleEcho
+		ok = true
+	}
+
+	return result, ok
 }
 
 func handleExit(args []string) {
@@ -72,6 +87,20 @@ func handleEcho(args []string) {
 	values := args[1:]
 
 	fmt.Print(strings.Join(values, " ") + "\n")
+}
+
+func handleType(args []string) {
+	xs := args[1:]
+
+	for _, x := range xs {
+		_, ok := getBuiltin(x)
+
+		if !ok {
+			fmt.Printf("%s not found\n", x)
+		} else {
+			fmt.Printf("%s is a shell builtin\n", x)
+		}
+	}
 }
 
 func handleNotFound(args []string) {
