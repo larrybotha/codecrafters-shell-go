@@ -9,7 +9,16 @@ import (
 	"strings"
 )
 
-type command func([]string)
+type (
+	command     func([]string)
+	commandType int
+)
+
+const (
+	cmdBuiltin commandType = iota
+	cmdSystem
+	cmdNotFound
+)
 
 func main() {
 	for {
@@ -33,9 +42,9 @@ func main() {
 			continue
 		}
 
-		builtinCommand, ok := getBuiltin(commandName)
+		builtinCommand, cmdType := getBuiltinCaommdn(commandName)
 
-		if !ok {
+		if cmdType == cmdNotFound {
 			handleNotFound(inputs)
 			continue
 		}
@@ -44,23 +53,23 @@ func main() {
 	}
 }
 
-func getBuiltin(commandName string) (command, bool) {
+func getBuiltinCaommdn(commandName string) (command, commandType) {
 	var result command
-	ok := false
+	cmdType := cmdNotFound
 
 	switch commandName {
 	case "exit":
 		result = handleExit
-		ok = true
+		cmdType = cmdBuiltin
 	case "type":
 		result = handleType
-		ok = true
+		cmdType = cmdBuiltin
 	case "echo":
 		result = handleEcho
-		ok = true
+		cmdType = cmdBuiltin
 	}
 
-	return result, ok
+	return result, cmdType
 }
 
 func handleExit(args []string) {
@@ -90,15 +99,20 @@ func handleEcho(args []string) {
 }
 
 func handleType(args []string) {
-	xs := args[1:]
+	commands := args[1:]
+	results := make(map[string]commandType)
 
-	for _, x := range xs {
-		_, ok := getBuiltin(x)
+	for _, x := range commands {
+		_, cmdType := getBuiltinCaommdn(x)
 
-		if !ok {
-			fmt.Printf("%s not found\n", x)
+		results[x] = cmdType
+	}
+
+	for k, cmdType := range results {
+		if cmdType == cmdNotFound {
+			fmt.Printf("%s not found\n", k)
 		} else {
-			fmt.Printf("%s is a shell builtin\n", x)
+			fmt.Printf("%s is a shell builtin\n", k)
 		}
 	}
 }
