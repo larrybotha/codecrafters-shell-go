@@ -162,7 +162,7 @@ func handleType(args []string) {
 
 			fmt.Printf("%s is %s\n", name, cmd)
 		} else {
-			fmt.Printf("%s not found\n", cmd)
+			fmt.Printf("%s: not found\n", cmd)
 		}
 	}
 }
