@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -72,6 +73,37 @@ func getBuiltinCaommdn(commandName string) (command, commandType) {
 	return result, cmdType
 }
 
+func getSystemCommand(commandName string) (string, commandType) {
+	pathEnv := os.Getenv("PATH")
+	paths := strings.Split(pathEnv, ":")
+	cmdType := cmdNotFound
+	cmdByPath := make(map[string]string)
+	var commandPaths []string
+
+	for _, x := range paths {
+		ys, _ := os.ReadDir(x)
+
+		for _, y := range ys {
+			if !y.IsDir() {
+				commandPaths = append(commandPaths, filepath.Join(x, y.Name()))
+			}
+		}
+	}
+
+	for _, x := range commandPaths {
+		parts := strings.Split(x, "/")
+		cmd := parts[len(parts)-1]
+		cmdByPath[cmd] = x
+	}
+
+	cmdPath, ok := cmdByPath[commandName]
+	if ok {
+		cmdType = cmdSystem
+	}
+
+	return cmdPath, cmdType
+}
+
 func handleExit(args []string) {
 	if len(args) > 2 {
 		fmt.Print("too many arguments\n")
@@ -108,11 +140,29 @@ func handleType(args []string) {
 		results[x] = cmdType
 	}
 
-	for k, cmdType := range results {
-		if cmdType == cmdNotFound {
-			fmt.Printf("%s not found\n", k)
+	for x, xType := range results {
+		if xType != cmdNotFound {
+			continue
+		}
+
+		cmdPath, cmdType := getSystemCommand(x)
+
+		if cmdType != cmdNotFound {
+			delete(results, x)
+			results[cmdPath] = cmdType
+		}
+	}
+
+	for cmd, cmdType := range results {
+		if cmdType == cmdBuiltin {
+			fmt.Printf("%s is a shell builtin\n", cmd)
+		} else if cmdType == cmdSystem {
+			parts := strings.Split(cmd, "/")
+			name := parts[len(parts)-1]
+
+			fmt.Printf("%s is %s\n", name, cmd)
 		} else {
-			fmt.Printf("%s is a shell builtin\n", k)
+			fmt.Printf("%s not found\n", cmd)
 		}
 	}
 }
