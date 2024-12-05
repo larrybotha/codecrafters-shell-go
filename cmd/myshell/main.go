@@ -43,7 +43,7 @@ func main() {
 			continue
 		}
 
-		builtinCommand, cmdType := getBuiltinCaommdn(commandName)
+		builtinCommand, cmdType := getBuiltinCommand(commandName)
 
 		if cmdType == cmdNotFound {
 			handleNotFound(inputs)
@@ -54,19 +54,15 @@ func main() {
 	}
 }
 
-func getBuiltinCaommdn(commandName string) (command, commandType) {
-	var result command
+func getBuiltinCommand(commandName string) (command, commandType) {
+	builtins := map[string]command{
+		"exit": handleExit,
+		"type": handleType,
+		"echo": handleEcho,
+	}
 	cmdType := cmdNotFound
-
-	switch commandName {
-	case "exit":
-		result = handleExit
-		cmdType = cmdBuiltin
-	case "type":
-		result = handleType
-		cmdType = cmdBuiltin
-	case "echo":
-		result = handleEcho
+	result, ok := builtins[commandName]
+	if ok {
 		cmdType = cmdBuiltin
 	}
 
@@ -135,7 +131,7 @@ func handleType(args []string) {
 	results := make(map[string]commandType)
 
 	for _, x := range commands {
-		_, cmdType := getBuiltinCaommdn(x)
+		_, cmdType := getBuiltinCommand(x)
 
 		results[x] = cmdType
 	}
