@@ -70,34 +70,22 @@ func getBuiltinCommand(commandName string) (command, commandType) {
 }
 
 func getSystemCommand(commandName string) (string, commandType) {
-	pathEnv := os.Getenv("PATH")
-	paths := strings.Split(pathEnv, ":")
+	paths := strings.Split(os.Getenv("PATH"), ":")
 	cmdType := cmdNotFound
-	cmdByPath := make(map[string]string)
-	var commandPaths []string
+	var path string
 
 	for _, x := range paths {
-		ys, _ := os.ReadDir(x)
+		cmdPath := filepath.Join(x, commandName)
+		fileInfo, err := os.Stat(filepath.Join(x, commandName))
 
-		for _, y := range ys {
-			if !y.IsDir() {
-				commandPaths = append(commandPaths, filepath.Join(x, y.Name()))
-			}
+		if err == nil && fileInfo.Mode().Perm()&0o100 != 0 {
+			path = cmdPath
+			cmdType = cmdSystem
+			break
 		}
 	}
 
-	for _, x := range commandPaths {
-		parts := strings.Split(x, "/")
-		cmd := parts[len(parts)-1]
-		cmdByPath[cmd] = x
-	}
-
-	cmdPath, ok := cmdByPath[commandName]
-	if ok {
-		cmdType = cmdSystem
-	}
-
-	return cmdPath, cmdType
+	return path, cmdType
 }
 
 func handleExit(args []string) {
@@ -128,36 +116,25 @@ func handleEcho(args []string) {
 
 func handleType(args []string) {
 	commands := args[1:]
-	results := make(map[string]commandType)
+	typeByCommand := make(map[string]commandType)
 
 	for _, x := range commands {
-		_, cmdType := getBuiltinCommand(x)
-
-		results[x] = cmdType
-	}
-
-	for x, xType := range results {
-		if xType != cmdNotFound {
-			continue
-		}
-
-		cmdPath, cmdType := getSystemCommand(x)
-
-		if cmdType != cmdNotFound {
-			delete(results, x)
-			results[cmdPath] = cmdType
-		}
-	}
-
-	for cmd, cmdType := range results {
-		if cmdType == cmdBuiltin {
-			fmt.Printf("%s is a shell builtin\n", cmd)
-		} else if cmdType == cmdSystem {
-			parts := strings.Split(cmd, "/")
-			name := parts[len(parts)-1]
-
-			fmt.Printf("%s is %s\n", name, cmd)
+		if _, cmdType := getBuiltinCommand(x); cmdType != cmdNotFound {
+			typeByCommand[x] = cmdType
+		} else if cmdPath, cmdType := getSystemCommand(x); cmdType != cmdNotFound {
+			typeByCommand[cmdPath] = cmdType
 		} else {
+			typeByCommand[x] = cmdNotFound
+		}
+	}
+
+	for cmd, cmdType := range typeByCommand {
+		switch cmdType {
+		case cmdBuiltin:
+			fmt.Printf("%s is a shell builtin\n", cmd)
+		case cmdSystem:
+			fmt.Printf("%s is %s\n", filepath.Base(cmd), cmd)
+		default:
 			fmt.Printf("%s: not found\n", cmd)
 		}
 	}
