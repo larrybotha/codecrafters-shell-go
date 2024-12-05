@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -43,15 +45,30 @@ func main() {
 			continue
 		}
 
-		builtinCommand, cmdType := getBuiltinCommand(commandName)
+		executeCommand(commandName, inputs)
+	}
+}
 
-		if cmdType == cmdNotFound {
-			handleNotFound(inputs)
-			continue
+func executeCommand(commandName string, inputs []string) {
+	if builtinCommand, cmdType := getBuiltinCommand(commandName); cmdType == cmdBuiltin {
+		builtinCommand(inputs)
+		return
+	}
+
+	if cmdPath, cmdType := getSystemCommand(commandName); cmdType == cmdSystem {
+		args := inputs[1:]
+		cmd := exec.Command(cmdPath, args...)
+
+		if output, err := cmd.Output(); err != nil {
+			log.Fatal(err.Error())
+		} else {
+			fmt.Println(string(output))
 		}
 
-		builtinCommand(inputs)
+		return
 	}
+
+	handleNotFound(inputs)
 }
 
 func getBuiltinCommand(commandName string) (command, commandType) {
