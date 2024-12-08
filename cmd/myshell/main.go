@@ -29,9 +29,9 @@ func main() {
 
 		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err == io.EOF {
-			fmt.Println("closing shell...")
+			fmt.Fprintln(os.Stdout, "closing shell...")
 		} else if err != nil {
-			fmt.Println("error: ", err.Error())
+			fmt.Fprintln(os.Stderr, "error: ", err.Error())
 		}
 
 		inputs := strings.Split(strings.TrimSpace(reader), " ")
@@ -62,7 +62,7 @@ func executeCommand(commandName string, inputs []string) {
 		if output, err := cmd.Output(); err != nil {
 			log.Fatal(err.Error())
 		} else {
-			fmt.Print(string(output))
+			fmt.Fprint(os.Stdout, string(output))
 		}
 
 		return
@@ -109,7 +109,7 @@ func getSystemCommand(commandName string) (string, commandType) {
 
 func handleExit(args []string) {
 	if len(args) > 2 {
-		fmt.Print("too many arguments\n")
+		fmt.Fprint(os.Stderr, "too many arguments\n")
 
 		return
 	}
@@ -131,7 +131,7 @@ func handleCd(args []string) {
 	path := strings.Join(args[1:], "")
 
 	if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
-		fmt.Printf("cd: %s: No such file or directory\n", path)
+		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", path)
 		return
 	}
 
@@ -141,23 +141,23 @@ func handleCd(args []string) {
 func handleEcho(args []string) {
 	values := args[1:]
 
-	fmt.Print(strings.Join(values, " ") + "\n")
+	fmt.Fprint(os.Stdout, strings.Join(values, " ")+"\n")
 }
 
 func handlePwd(args []string) {
 	if len(args[1:]) > 2 {
-		fmt.Print("too many arguments\n")
+		fmt.Fprint(os.Stderr, "too many arguments\n")
 
 		return
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		fmt.Print(err.Error() + "\n")
+		fmt.Fprint(os.Stderr, err.Error()+"\n")
 		return
 	}
 
-	fmt.Print(wd + "\n")
+	fmt.Fprint(os.Stdout, wd+"\n")
 }
 
 func handleType(args []string) {
@@ -177,11 +177,11 @@ func handleType(args []string) {
 	for cmd, cmdType := range typeByCommand {
 		switch cmdType {
 		case cmdBuiltin:
-			fmt.Printf("%s is a shell builtin\n", cmd)
+			fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", cmd)
 		case cmdSystem:
-			fmt.Printf("%s is %s\n", filepath.Base(cmd), cmd)
+			fmt.Fprintf(os.Stdout, "%s is %s\n", filepath.Base(cmd), cmd)
 		default:
-			fmt.Printf("%s: not found\n", cmd)
+			fmt.Fprintf(os.Stderr, "%s: not found\n", cmd)
 		}
 	}
 }
@@ -189,5 +189,5 @@ func handleType(args []string) {
 func handleNotFound(args []string) {
 	command := args[0]
 
-	fmt.Printf("%s: command not found\n", command)
+	fmt.Fprintf(os.Stderr, "%s: command not found\n", command)
 }
