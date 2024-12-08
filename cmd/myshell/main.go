@@ -132,13 +132,7 @@ func handleCd(args []string) {
 	path := strings.TrimSpace(strings.Join(args[1:], ""))
 
 	if path == "~" {
-		if homeDir, err := os.UserHomeDir(); err != nil {
-			fmt.Fprint(os.Stderr, err.Error())
-		} else {
-			os.Chdir(homeDir)
-		}
-
-		return
+		path, _ = os.UserHomeDir()
 	}
 
 	if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
