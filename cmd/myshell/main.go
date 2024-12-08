@@ -30,6 +30,7 @@ func main() {
 		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err == io.EOF {
 			fmt.Fprintln(os.Stdout, "closing shell...")
+			os.Exit(0)
 		} else if err != nil {
 			fmt.Fprintln(os.Stderr, "error: ", err.Error())
 		}
