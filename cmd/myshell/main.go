@@ -73,10 +73,11 @@ func executeCommand(commandName string, inputs []string) {
 
 func getBuiltinCommand(commandName string) (command, commandType) {
 	builtins := map[string]command{
-		"exit": handleExit,
-		"type": handleType,
+		"cd":   handleCd,
 		"echo": handleEcho,
+		"exit": handleExit,
 		"pwd":  handlePwd,
+		"type": handleType,
 	}
 	cmdType := cmdNotFound
 	result, ok := builtins[commandName]
@@ -124,6 +125,17 @@ func handleExit(args []string) {
 	}
 
 	os.Exit(status)
+}
+
+func handleCd(args []string) {
+	path := strings.Join(args[1:], "")
+
+	if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
+		fmt.Printf("cd: %s: No such file or directory\n", path)
+		return
+	}
+
+	os.Chdir(path)
 }
 
 func handleEcho(args []string) {
