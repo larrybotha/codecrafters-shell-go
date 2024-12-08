@@ -139,7 +139,9 @@ func handleCd(args []string) {
 		}
 
 		path = homeDir
-	} else if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
+	}
+
+	if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
 		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", path)
 		return
 	}
