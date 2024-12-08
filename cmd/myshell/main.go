@@ -130,7 +130,7 @@ func handleExit(args []string) {
 func handleCd(args []string) {
 	path := strings.Join(args[1:], "")
 
-	if err := os.Chdir(path); err != nil {
+	if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
 		fmt.Printf("cd: %s: No such file or directory\n", path)
 		return
 	}
