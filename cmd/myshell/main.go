@@ -76,6 +76,7 @@ func getBuiltinCommand(commandName string) (command, commandType) {
 		"exit": handleExit,
 		"type": handleType,
 		"echo": handleEcho,
+		"pwd":  handlePwd,
 	}
 	cmdType := cmdNotFound
 	result, ok := builtins[commandName]
@@ -129,6 +130,22 @@ func handleEcho(args []string) {
 	values := args[1:]
 
 	fmt.Print(strings.Join(values, " ") + "\n")
+}
+
+func handlePwd(args []string) {
+	if len(args[1:]) > 2 {
+		fmt.Print("too many arguments\n")
+
+		return
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Print(err.Error() + "\n")
+		return
+	}
+
+	fmt.Print(wd + "\n")
 }
 
 func handleType(args []string) {
