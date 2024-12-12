@@ -43,10 +43,7 @@ func main() {
 
 		if result := r.FindAllString(input, -1); result != nil {
 			for _, x := range result {
-				if len(x) > 0 {
-					x = strings.ReplaceAll(x, "'", "")
-					inputs = append(inputs, strings.TrimSpace(x))
-				}
+				inputs = append(inputs, strings.ReplaceAll(x, "'", ""))
 			}
 		}
 
