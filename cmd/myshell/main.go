@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -35,7 +36,20 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error: ", err.Error())
 		}
 
-		inputs := strings.Split(strings.TrimSpace(reader), " ")
+		var inputs []string
+
+		input := strings.TrimSpace(reader)
+		r := regexp.MustCompile(`'[^']*'|\S+`)
+
+		if result := r.FindAllString(input, -1); result != nil {
+			for _, x := range result {
+				if len(x) > 0 {
+					inputs = append(inputs, strings.TrimSpace(x))
+				}
+			}
+		}
+
+		fmt.Println(inputs)
 		commandName := ""
 
 		if len(inputs) > 0 {
