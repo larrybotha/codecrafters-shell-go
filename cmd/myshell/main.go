@@ -49,7 +49,6 @@ func main() {
 			}
 		}
 
-		fmt.Println(inputs)
 		commandName := ""
 
 		if len(inputs) > 0 {
