@@ -39,13 +39,15 @@ func main() {
 		var inputs []string
 
 		input := strings.TrimSpace(reader)
-		r := regexp.MustCompile(`'[^']*'|\S+`)
+		r := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
 
 		if result := r.FindAllString(input, -1); result != nil {
 			for _, x := range result {
-				inputs = append(inputs, strings.ReplaceAll(x, "'", ""))
+				inputs = append(inputs, stripQuotedString(x))
 			}
 		}
+
+		fmt.Println(inputs)
 
 		commandName := ""
 
@@ -59,6 +61,16 @@ func main() {
 
 		executeCommand(commandName, inputs)
 	}
+}
+
+func stripQuotedString(x string) string {
+	if strings.HasPrefix(x, "'") {
+		x = regexp.MustCompile(`^(')(.*?)(')$`).ReplaceAllString(x, "$2")
+	} else {
+		x = regexp.MustCompile(`^(")(.*?)(")$`).ReplaceAllString(x, "$2")
+	}
+
+	return x
 }
 
 func executeCommand(commandName string, inputs []string) {
