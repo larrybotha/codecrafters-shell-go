@@ -62,11 +62,13 @@ func main() {
 }
 
 func stripQuotedString(x string) string {
+	quote := "\""
+
 	if strings.HasPrefix(x, "'") {
-		x = regexp.MustCompile(`^(')(.*?)(')$`).ReplaceAllString(x, "$2")
-	} else {
-		x = regexp.MustCompile(`^(")(.*?)(")$`).ReplaceAllString(x, "$2")
+		quote = "'"
 	}
+
+	x = regexp.MustCompile(`^(`+quote+`)(.*?)(`+quote+`)$`).ReplaceAllString(x, "$2")
 
 	return x
 }
