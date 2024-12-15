@@ -36,29 +36,30 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error: ", err.Error())
 		}
 
-		var inputs []string
+		inputs := getArgs(strings.TrimSpace(reader))
 
-		input := strings.TrimSpace(reader)
-		r := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
-
-		if result := r.FindAllString(input, -1); result != nil {
-			for _, x := range result {
-				inputs = append(inputs, stripQuotedString(x))
-			}
-		}
-
-		commandName := ""
-
-		if len(inputs) > 0 {
-			commandName = strings.TrimSpace(inputs[0])
-		}
-
-		if commandName == "" {
+		if len(inputs) == 0 {
 			continue
 		}
 
+		commandName := strings.TrimSpace(inputs[0])
+
 		executeCommand(commandName, inputs)
 	}
+}
+
+func getArgs(input string) []string {
+	var inputs []string
+
+	r := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
+
+	if result := r.FindAllString(input, -1); result != nil {
+		for _, x := range result {
+			inputs = append(inputs, stripQuotedString(x))
+		}
+	}
+
+	return inputs
 }
 
 func stripQuotedString(x string) string {
