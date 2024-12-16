@@ -67,9 +67,10 @@ func prepareArg(x string) string {
 		(strings.HasPrefix(x, "'") && strings.HasSuffix(x, "'"))
 
 	if isQuoted {
-		r := regexp.MustCompile(`^(["'])(.*?)(["'])$`)
-
-		x = r.ReplaceAllString(x, "$2")
+		quoteBounds := regexp.MustCompile(`^(["'])(.*?)(["'])$`)
+		backslashes := regexp.MustCompile(`\\(["$\\n\\])`)
+		x = quoteBounds.ReplaceAllString(x, "$2")
+		x = backslashes.ReplaceAllString(x, "$1")
 	} else {
 		x = strings.ReplaceAll(x, "\\", "")
 	}
