@@ -49,21 +49,22 @@ func main() {
 }
 
 func getArgs(input string) []string {
-	var inputs []string
+	var args []string
 
 	r := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
 
 	if result := r.FindAllString(input, -1); result != nil {
-		for _, x := range result {
-			inputs = append(inputs, stripQuotedString(x))
+		for _, arg := range result {
+			args = append(args, prepareArg(arg))
 		}
 	}
 
-	return inputs
+	return args
 }
 
-func stripQuotedString(x string) string {
-	isQuoted := (strings.HasPrefix(x, "\"") && strings.HasSuffix(x, "\"")) || (strings.HasPrefix(x, "'") && strings.HasSuffix(x, "'"))
+func prepareArg(x string) string {
+	isQuoted := (strings.HasPrefix(x, `"`) && strings.HasSuffix(x, `"`)) ||
+		(strings.HasPrefix(x, "'") && strings.HasSuffix(x, "'"))
 
 	if isQuoted {
 		r := regexp.MustCompile(`^(["'])(.*?)(["'])$`)
