@@ -63,13 +63,15 @@ func getArgs(input string) []string {
 }
 
 func stripQuotedString(x string) string {
-	quote := "\""
+	isQuoted := (strings.HasPrefix(x, "\"") && strings.HasSuffix(x, "\"")) || (strings.HasPrefix(x, "'") && strings.HasSuffix(x, "'"))
 
-	if strings.HasPrefix(x, "'") {
-		quote = "'"
+	if isQuoted {
+		r := regexp.MustCompile(`^(["'])(.*?)(["'])$`)
+
+		x = r.ReplaceAllString(x, "$2")
+	} else {
+		x = strings.ReplaceAll(x, "\\", "")
 	}
-
-	x = regexp.MustCompile(`^(`+quote+`)(.*?)(`+quote+`)$`).ReplaceAllString(x, "$2")
 
 	return x
 }
