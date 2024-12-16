@@ -51,7 +51,7 @@ func main() {
 func getArgs(input string) []string {
 	var args []string
 
-	r := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
+	r := regexp.MustCompile(`'[^'].*'|"[^"].*"|\S+`)
 
 	if result := r.FindAllString(input, -1); result != nil {
 		for _, arg := range result {
