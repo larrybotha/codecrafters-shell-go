@@ -68,7 +68,7 @@ func prepareArg(x string) string {
 
 	if isQuoted {
 		quoteBounds := regexp.MustCompile(`^(["'])(.*?)(["'])$`)
-		backslashes := regexp.MustCompile(`\\(["$\\n\\])`)
+		backslashes := regexp.MustCompile(`\\(["$\\n\\])?`)
 		x = quoteBounds.ReplaceAllString(x, "$2")
 		x = backslashes.ReplaceAllString(x, "$1")
 	} else {
