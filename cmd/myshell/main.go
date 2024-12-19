@@ -51,7 +51,7 @@ func main() {
 func getArgs(input string) []string {
 	var args []string
 
-	r := regexp.MustCompile(`'[^'].*'|"[^"].*"|\S+`)
+	r := regexp.MustCompile(`'[^'][\\.][\\.]*'|"[^"][\\.]*"|\S+`)
 
 	if result := r.FindAllString(input, -1); result != nil {
 		for _, arg := range result {
@@ -62,20 +62,73 @@ func getArgs(input string) []string {
 	return args
 }
 
-func prepareArg(x string) string {
-	isQuoted := (strings.HasPrefix(x, `"`) && strings.HasSuffix(x, `"`)) ||
-		(strings.HasPrefix(x, "'") && strings.HasSuffix(x, "'"))
+const (
+	quotesOpen = iota
+	quotesClosed
+)
 
-	if isQuoted {
-		quoteBounds := regexp.MustCompile(`^(["'])(.*?)(["'])$`)
-		backslashes := regexp.MustCompile(`\\(["$\\n\\])?`)
-		x = quoteBounds.ReplaceAllString(x, "$2")
-		x = backslashes.ReplaceAllString(x, "$1")
-	} else {
-		x = strings.ReplaceAll(x, "\\", "")
+func prepareArg(rawArg string) string {
+	var firstChar byte
+
+	if len(rawArg) > 0 {
+		firstChar = rawArg[0]
 	}
 
-	return x
+	switch firstChar {
+	case '"':
+		var tmpString []rune
+		maybeEscaping := false
+
+		for _, x := range rawArg {
+			var ys []rune
+
+			switch x {
+			case '"':
+				if maybeEscaping {
+					ys = append(ys, x)
+					maybeEscaping = false
+				}
+			case '\\':
+				if maybeEscaping {
+					ys = append(ys, x)
+				}
+
+				maybeEscaping = !maybeEscaping
+			case '$', 'n', '`':
+				if maybeEscaping {
+					maybeEscaping = false
+				}
+
+				tmpString = append(tmpString, x)
+			default:
+				if maybeEscaping {
+					ys = append(ys, '\\')
+					maybeEscaping = false
+				}
+
+				ys = append(ys, x)
+			}
+
+			tmpString = append(tmpString, ys...)
+		}
+
+		rawArg = string(tmpString)
+	case '\'':
+		var tmpString string
+
+		for _, x := range strings.Split(rawArg, "") {
+			if x == "'" {
+				continue
+			}
+
+			tmpString += x
+		}
+
+		rawArg = tmpString
+	default:
+		rawArg = strings.ReplaceAll(rawArg, "\\", "")
+	}
+	return rawArg
 }
 
 func executeCommand(commandName string, inputs []string) {
