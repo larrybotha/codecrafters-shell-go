@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -36,7 +35,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error: ", err.Error())
 		}
 
-		inputs := getArgs(strings.TrimSpace(reader))
+		inputs := parseArgs(strings.TrimSpace(reader))
 
 		if len(inputs) == 0 {
 			continue
@@ -48,87 +47,76 @@ func main() {
 	}
 }
 
-func getArgs(input string) []string {
+const (
+	doubleQuoted = iota
+	doubleQuotedEscaped
+	notQuoted
+	singleQuoted
+)
+
+func parseArgs(input string) []string {
 	var args []string
+	currWord := ""
+	state := notQuoted
 
-	r := regexp.MustCompile(`'[^'][\\.][\\.]*'|"[^"][\\.]*"|\S+`)
+	for i, x := range input {
+		startNextWord := false
+		nextState := state
+		toAdd := ""
 
-	if result := r.FindAllString(input, -1); result != nil {
-		for _, arg := range result {
-			args = append(args, prepareArg(arg))
+		if state == notQuoted {
+			switch x {
+			case '"':
+				nextState = doubleQuoted
+			case '\'':
+				nextState = singleQuoted
+			case ' ':
+				startNextWord = len(currWord) > 0
+			default:
+				toAdd = string(x)
+			}
+		}
+
+		if state == singleQuoted {
+			if x == '\'' {
+				nextState = notQuoted
+			} else {
+				toAdd = string(x)
+			}
+		}
+
+		if state == doubleQuoted {
+			switch x {
+			case '\\':
+				nextState = doubleQuotedEscaped
+			case '"':
+				nextState = notQuoted
+			default:
+				toAdd = string(x)
+			}
+		}
+
+		if state == doubleQuotedEscaped {
+			switch x {
+			case '"', '$', '`', '\\', 'n':
+				toAdd = string(x)
+			default:
+				toAdd = "\\" + string(x)
+			}
+
+			nextState = doubleQuoted
+		}
+
+		state = nextState
+		currWord += toAdd
+
+		if startNextWord || i == len(input)-1 {
+			args = append(args, strings.TrimSpace(currWord))
+			currWord = ""
 		}
 	}
 
 	return args
-}
-
-const (
-	quotesOpen = iota
-	quotesClosed
-)
-
-func prepareArg(rawArg string) string {
-	var firstChar byte
-
-	if len(rawArg) > 0 {
-		firstChar = rawArg[0]
-	}
-
-	switch firstChar {
-	case '"':
-		var tmpString []rune
-		maybeEscaping := false
-
-		for _, x := range rawArg {
-			var ys []rune
-
-			switch x {
-			case '"':
-				if maybeEscaping {
-					ys = append(ys, x)
-					maybeEscaping = false
-				}
-			case '\\':
-				if maybeEscaping {
-					ys = append(ys, x)
-				}
-
-				maybeEscaping = !maybeEscaping
-			case '$', 'n', '`':
-				if maybeEscaping {
-					maybeEscaping = false
-				}
-
-				tmpString = append(tmpString, x)
-			default:
-				if maybeEscaping {
-					ys = append(ys, '\\')
-					maybeEscaping = false
-				}
-
-				ys = append(ys, x)
-			}
-
-			tmpString = append(tmpString, ys...)
-		}
-
-		rawArg = string(tmpString)
-	case '\'':
-		var tmpString string
-
-		for _, x := range strings.Split(rawArg, "") {
-			if x == "'" {
-				continue
-			}
-
-			tmpString += x
-		}
-
-		rawArg = tmpString
-	default:
-		rawArg = strings.ReplaceAll(rawArg, "\\", "")
-	}
-	return rawArg
 }
 
 func executeCommand(commandName string, inputs []string) {
