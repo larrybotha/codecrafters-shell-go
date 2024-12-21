@@ -50,26 +50,29 @@ func main() {
 const (
 	doubleQuoted = iota
 	doubleQuotedEscaped
-	notQuoted
+	unquoted
+	unquotedEscaped
 	singleQuoted
 )
 
 func parseArgs(input string) []string {
 	var args []string
 	currWord := ""
-	state := notQuoted
+	state := unquoted
 
 	for i, x := range input {
 		startNextWord := false
 		nextState := state
 		toAdd := ""
 
-		if state == notQuoted {
+		if state == unquoted {
 			switch x {
 			case '"':
 				nextState = doubleQuoted
 			case '\'':
 				nextState = singleQuoted
+			case '\\':
+				nextState = unquotedEscaped
 			case ' ':
 				startNextWord = len(currWord) > 0
 			default:
@@ -77,9 +80,14 @@ func parseArgs(input string) []string {
 			}
 		}
 
+		if state == unquotedEscaped {
+			nextState = unquoted
+			toAdd = string(x)
+		}
+
 		if state == singleQuoted {
 			if x == '\'' {
-				nextState = notQuoted
+				nextState = unquoted
 			} else {
 				toAdd = string(x)
 			}
@@ -90,15 +98,15 @@ func parseArgs(input string) []string {
 			case '\\':
 				nextState = doubleQuotedEscaped
 			case '"':
-				nextState = notQuoted
+				nextState = unquoted
 			default:
 				toAdd = string(x)
 			}
 		}
 
 		if state == doubleQuotedEscaped {
-			switch x {
-			case '"', '$', '`', '\\', 'n':
+			switch string(x) {
+			case "\"", "$", "`", "\\", "\n":
 				toAdd = string(x)
 			default:
 				toAdd = "\\" + string(x)
