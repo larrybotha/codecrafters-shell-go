@@ -61,7 +61,7 @@ func parseArgs(input string) []string {
 	state := unquoted
 
 	for i, x := range input {
-		startNextWord := false
+		startNextWord := i == len(input)-1
 		nextState := state
 		toAdd := ""
 
@@ -74,7 +74,7 @@ func parseArgs(input string) []string {
 			case '\\':
 				nextState = unquotedEscaped
 			case ' ':
-				startNextWord = len(currWord) > 0
+				startNextWord = startNextWord || len(currWord) > 0
 			default:
 				toAdd = string(x)
 			}
@@ -118,7 +118,7 @@ func parseArgs(input string) []string {
 		state = nextState
 		currWord += toAdd
 
-		if startNextWord || i == len(input)-1 {
+		if startNextWord {
 			args = append(args, strings.TrimSpace(currWord))
 			currWord = ""
 		}
