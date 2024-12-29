@@ -12,12 +12,12 @@ import (
 )
 
 type (
-	command     func([]string) (commandResult, commandStatus)
+	command     func([]string) (commandOutput, commandStatus)
 	commandType int
 )
 
 type (
-	commandResult = string
+	commandOutput = string
 	commandStatus = int
 )
 
@@ -40,18 +40,30 @@ func main() {
 		}
 
 		args := parseArgs(strings.TrimSpace(reader))
-		if len(args) == 0 {
-			continue
-		}
+		aggregatedArgs := aggregateArgs(args)
+		var lastOutput string
 
-		commandName := strings.TrimSpace(args[0])
+		for i, aggregate := range aggregatedArgs {
+			aggregate = append(aggregate, lastOutput)
 
-		result, status := executeCommand(commandName, args)
+			if len(aggregate) == 0 {
+				continue
+			}
 
-		if status > 0 {
-			fmt.Fprintln(os.Stderr, result)
-		} else {
-			fmt.Fprintln(os.Stdout, result)
+			commandName := strings.TrimSpace(aggregate[0])
+
+			output, status := executeCommand(commandName, aggregate)
+
+			if status > 0 {
+				fmt.Fprintln(os.Stderr, output)
+				break
+			}
+
+			if i == len(aggregatedArgs)-1 {
+				fmt.Fprintln(os.Stdout, output)
+			} else {
+				lastOutput = output
+			}
 		}
 	}
 }
@@ -136,24 +148,44 @@ func parseArgs(input string) []string {
 	return args
 }
 
-func executeCommand(commandName string, inputs []string) (commandResult, commandStatus) {
+func aggregateArgs(args []string) [][]string {
+	var aggregates [][]string
+	currAggregate := []string{}
+
+	for i, x := range args {
+		if strings.HasSuffix(x, ">") {
+			aggregates = append(aggregates, currAggregate)
+			currAggregate = []string{}
+		} else {
+			currAggregate = append(currAggregate, x)
+		}
+
+		if i == len(args)-1 {
+			aggregates = append(aggregates, currAggregate)
+		}
+	}
+
+	return aggregates
+}
+
+func executeCommand(commandName string, inputs []string) (commandOutput, commandStatus) {
 	if builtinCommand, cmdType := getBuiltinCommand(commandName); cmdType == cmdBuiltin {
 		return builtinCommand(inputs)
 	}
 
 	if cmdPath, cmdType := getSystemCommand(commandName); cmdType == cmdSystem {
 		var status commandStatus = 1
-		var result commandResult
+		var output commandOutput
 		args := inputs[1:]
 		cmd := exec.Command(cmdPath, args...)
 
-		if output, err := cmd.Output(); err != nil {
-			result = err.Error()
+		if xs, err := cmd.Output(); err != nil {
+			output = err.Error()
 		} else {
-			result = string(output)
+			output = string(xs)
 		}
 
-		return result, status
+		return output, status
 	}
 
 	return handleNotFound(inputs)
@@ -168,12 +200,12 @@ func getBuiltinCommand(commandName string) (command, commandType) {
 		"type": handleType,
 	}
 	cmdType := cmdNotFound
-	result, ok := builtins[commandName]
+	output, ok := builtins[commandName]
 	if ok {
 		cmdType = cmdBuiltin
 	}
 
-	return result, cmdType
+	return output, cmdType
 }
 
 func getSystemCommand(commandName string) (string, commandType) {
@@ -195,12 +227,12 @@ func getSystemCommand(commandName string) (string, commandType) {
 	return path, cmdType
 }
 
-func handleExit(args []string) (commandResult, commandStatus) {
-	var result commandResult
+func handleExit(args []string) (commandOutput, commandStatus) {
+	var output commandOutput
 	status := 0
 
 	if len(args) > 2 {
-		result = fmt.Sprintf("too many arguments")
+		output = fmt.Sprintf("too many arguments")
 		status = 1
 	}
 
@@ -209,78 +241,78 @@ func handleExit(args []string) (commandResult, commandStatus) {
 		x, err := strconv.Atoi(arg)
 		if err != nil {
 			status = x
-			result = err.Error()
+			output = err.Error()
 		}
 	}
 
 	// TODO: understand why this doesn't raise compiler errors
 	os.Exit(status)
 
-	return result, status
+	return output, status
 }
 
-func handleCd(args []string) (commandResult, commandStatus) {
+func handleCd(args []string) (commandOutput, commandStatus) {
 	var status commandStatus = 1
-	var result commandResult
+	var output commandOutput
 	path := strings.TrimSpace(strings.Join(args[1:], ""))
 
 	if path == "~" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			result = err.Error()
+			output = err.Error()
 		}
 
 		path = homeDir
 	} else if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
-		result = fmt.Sprintf("cd: %s: No such file or directory", path)
+		output = fmt.Sprintf("cd: %s: No such file or directory", path)
 	}
 
 	err := os.Chdir(path)
 	if err != nil {
-		result = fmt.Sprintf("error: %s", err.Error())
+		output = fmt.Sprintf("error: %s", err.Error())
 	}
 
-	if len(result) == 0 {
+	if len(output) == 0 {
 		status = 0
 	}
 
-	return result, status
+	return output, status
 }
 
-func handleEcho(args []string) (commandResult, commandStatus) {
+func handleEcho(args []string) (commandOutput, commandStatus) {
 	status := 0
 	values := args[1:]
-	result := strings.Join(values, " ")
+	output := strings.Join(values, " ")
 
-	return result, commandStatus(status)
+	return output, commandStatus(status)
 }
 
-func handlePwd(args []string) (commandResult, commandStatus) {
+func handlePwd(args []string) (commandOutput, commandStatus) {
 	var status commandStatus = 1
-	var result commandResult
+	var output commandOutput
 
 	if len(args[1:]) > 2 {
-		result = "too many arguments"
+		output = "too many arguments"
 
-		return result, status
+		return output, status
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		result = err.Error()
+		output = err.Error()
 	} else {
-		result = wd
+		output = wd
 		status = 0
 	}
 
-	return result, status
+	return output, status
 }
 
-func handleType(args []string) (commandResult, commandStatus) {
+func handleType(args []string) (commandOutput, commandStatus) {
 	commands := args[1:]
 	typeByCommand := make(map[string]commandType)
 	var status commandStatus = 1
-	var result commandResult
+	var output commandOutput
 
 	for _, x := range commands {
 		if _, cmdType := getBuiltinCommand(x); cmdType != cmdNotFound {
@@ -295,20 +327,20 @@ func handleType(args []string) (commandResult, commandStatus) {
 	for cmd, cmdType := range typeByCommand {
 		switch cmdType {
 		case cmdBuiltin:
-			result = fmt.Sprintf("%s is a shell builtin", cmd)
+			output = fmt.Sprintf("%s is a shell builtin", cmd)
 			status = 0
 		case cmdSystem:
-			result = fmt.Sprintf("%s is %s", filepath.Base(cmd), cmd)
+			output = fmt.Sprintf("%s is %s", filepath.Base(cmd), cmd)
 			status = 0
 		default:
-			result = fmt.Sprintf("%s: not found", cmd)
+			output = fmt.Sprintf("%s: not found", cmd)
 		}
 	}
 
-	return result, status
+	return output, status
 }
 
-func handleNotFound(args []string) (commandResult, commandStatus) {
+func handleNotFound(args []string) (commandOutput, commandStatus) {
 	command := args[0]
 
 	return fmt.Sprintf("%s: command not found", command), 1
