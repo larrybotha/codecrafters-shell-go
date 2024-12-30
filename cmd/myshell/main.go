@@ -23,15 +23,16 @@ type (
 
 const (
 	cmdBuiltin commandType = iota
-	cmdSystem
+	cmdCompound
 	cmdNotFound
+	cmdSystem
 )
 
 func main() {
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
 
-		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		input, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err == io.EOF {
 			fmt.Fprintln(os.Stdout, "closing shell...")
 			os.Exit(0)
@@ -39,31 +40,34 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error: ", err.Error())
 		}
 
-		args := parseArgs(strings.TrimSpace(reader))
-		aggregatedArgs := aggregateArgs(args)
-		var lastOutput string
+		handleInput(input)
+	}
+}
 
-		for i, aggregate := range aggregatedArgs {
+func handleInput(input string) {
+	var lastOutput string
+	args := parseArgs(strings.TrimSpace(input))
+	aggregatedArgs := aggregateArgs(args)
+
+	for i, aggregate := range aggregatedArgs {
+		if len(lastOutput) > 0 {
 			aggregate = append(aggregate, lastOutput)
+		}
 
-			if len(aggregate) == 0 {
-				continue
-			}
+		if len(aggregate) == 0 {
+			continue
+		}
 
-			commandName := strings.TrimSpace(aggregate[0])
+		commandName := strings.TrimSpace(aggregate[0])
+		output, status := executeCommand(commandName, aggregate)
 
-			output, status := executeCommand(commandName, aggregate)
-
-			if status > 0 {
-				fmt.Fprintln(os.Stderr, output)
-				break
-			}
-
-			if i == len(aggregatedArgs)-1 {
-				fmt.Fprintln(os.Stdout, output)
-			} else {
-				lastOutput = output
-			}
+		switch true {
+		case status > 0:
+			fmt.Fprintln(os.Stderr, output)
+		case i == len(aggregatedArgs)-1:
+			fmt.Fprintln(os.Stdout, output)
+		default:
+			lastOutput = output
 		}
 	}
 }
@@ -155,7 +159,7 @@ func aggregateArgs(args []string) [][]string {
 	for i, x := range args {
 		if strings.HasSuffix(x, ">") {
 			aggregates = append(aggregates, currAggregate)
-			currAggregate = []string{}
+			currAggregate = []string{x}
 		} else {
 			currAggregate = append(currAggregate, x)
 		}
@@ -169,6 +173,10 @@ func aggregateArgs(args []string) [][]string {
 }
 
 func executeCommand(commandName string, inputs []string) (commandOutput, commandStatus) {
+	if compoundCommand, cmdType := getCompoundCommand(commandName); cmdType == cmdCompound {
+		return compoundCommand(inputs)
+	}
+
 	if builtinCommand, cmdType := getBuiltinCommand(commandName); cmdType == cmdBuiltin {
 		return builtinCommand(inputs)
 	}
@@ -183,6 +191,7 @@ func executeCommand(commandName string, inputs []string) (commandOutput, command
 			output = err.Error()
 		} else {
 			output = string(xs)
+			status = 0
 		}
 
 		return output, status
@@ -191,6 +200,56 @@ func executeCommand(commandName string, inputs []string) (commandOutput, command
 	return handleNotFound(inputs)
 }
 
+func handleRedirect(args []string) (commandOutput, commandStatus) {
+	var output commandOutput
+	var file *os.File
+	var err error
+	status := 1
+
+	if len(args) < 2 {
+		output = fmt.Sprintf("too few arguments for redirect")
+		status = 1
+
+		return output, status
+	}
+
+	fileName := args[1]
+	fileArgs := args[2:]
+
+	_, statErr := os.Stat(fileName)
+
+	if os.IsNotExist(statErr) {
+		file, err = os.Create(fileName)
+	} else {
+		file, err = os.OpenFile(fileName, os.O_WRONLY, 0o644)
+	}
+
+	if file != nil && err == nil {
+		_, err = file.Write([]byte(strings.Join(fileArgs, "")))
+	}
+
+	if err != nil {
+		output = err.Error()
+		status = 1
+	}
+
+	return output, status
+}
+
+// TODO: should return err if commandName is not compound
+func getCompoundCommand(commandName string) (command, commandType) {
+	var cmd command
+	cmdType := cmdNotFound
+
+	if strings.HasSuffix(commandName, ">") {
+		cmdType = cmdCompound
+		cmd = handleRedirect
+	}
+
+	return cmd, cmdType
+}
+
+// TODO: should return err if commandName is not compound
 func getBuiltinCommand(commandName string) (command, commandType) {
 	builtins := map[string]command{
 		"cd":   handleCd,
@@ -201,6 +260,7 @@ func getBuiltinCommand(commandName string) (command, commandType) {
 	}
 	cmdType := cmdNotFound
 	output, ok := builtins[commandName]
+
 	if ok {
 		cmdType = cmdBuiltin
 	}
@@ -208,10 +268,11 @@ func getBuiltinCommand(commandName string) (command, commandType) {
 	return output, cmdType
 }
 
+// TODO: should return err if commandName is not compound
 func getSystemCommand(commandName string) (string, commandType) {
+	var path string
 	paths := strings.Split(os.Getenv("PATH"), ":")
 	cmdType := cmdNotFound
-	var path string
 
 	for _, x := range paths {
 		cmdPath := filepath.Join(x, commandName)
@@ -245,7 +306,8 @@ func handleExit(args []string) (commandOutput, commandStatus) {
 		}
 	}
 
-	// TODO: understand why this doesn't raise compiler errors
+	// TODO: understand why this doesn't raise compiler errors when followed by
+	// return statement
 	os.Exit(status)
 
 	return output, status
