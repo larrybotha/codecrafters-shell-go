@@ -242,23 +242,41 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 	var file *os.File
 	var err error
 	fileName := config.args[1]
+	flag := os.O_WRONLY
+	redirect := config.args[0]
+	fileArgs := []string{}
+	useAppend := strings.HasSuffix(redirect, ">>")
 	_, statErr := os.Stat(fileName)
+
+	if useAppend {
+		flag = os.O_APPEND | os.O_WRONLY
+	}
 
 	if os.IsNotExist(statErr) {
 		file, err = os.Create(fileName)
 	} else {
-		file, err = os.OpenFile(fileName, os.O_WRONLY, 0o644)
+		file, err = os.OpenFile(fileName, flag, 0o644)
 	}
-
-	redirect := config.args[0]
-	fileArgs := []string{}
+	defer file.Close()
 
 	switch true {
-	case slices.Contains([]string{"2>"}, redirect):
-		fileArgs = []string{prevConfig.stdErr}
+	case slices.Contains([]string{"2>", "2>>"}, redirect):
+		suffix := ""
+
+		if useAppend {
+			suffix = "\n"
+		}
+
+		fileArgs = []string{suffix + prevConfig.stdErr}
 		config.stdOut = prevConfig.stdOut
-	case slices.Contains([]string{"1>", ">"}, redirect):
-		fileArgs = []string{prevConfig.stdOut}
+	case slices.Contains([]string{"1>", "1>>", ">", ">>"}, redirect):
+		suffix := ""
+
+		if useAppend {
+			suffix = "\n"
+		}
+
+		fileArgs = []string{suffix + prevConfig.stdOut}
 		config.stdOut = prevConfig.stdErr
 	}
 
