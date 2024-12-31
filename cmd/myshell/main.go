@@ -83,7 +83,7 @@ const (
 
 func parseArgs(input string) []string {
 	var args []string
-	currWord := ""
+	var currWord strings.Builder
 	state := unquoted
 
 	for i, x := range input {
@@ -100,7 +100,7 @@ func parseArgs(input string) []string {
 			case '\\':
 				nextState = unquotedEscaped
 			case ' ':
-				startNextWord = startNextWord || len(currWord) > 0
+				startNextWord = startNextWord || currWord.Len() > 0
 			default:
 				toAdd = string(x)
 			}
@@ -142,11 +142,13 @@ func parseArgs(input string) []string {
 		}
 
 		state = nextState
-		currWord += toAdd
+
+		currWord.WriteString(toAdd)
 
 		if startNextWord {
-			args = append(args, strings.TrimSpace(currWord))
-			currWord = ""
+			args = append(args, strings.TrimSpace(currWord.String()))
+
+			currWord.Reset()
 		}
 	}
 
