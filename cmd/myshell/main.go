@@ -185,14 +185,16 @@ func executeCommand(commandName string, inputs []string) (commandOutput, command
 	if cmdPath, cmdType := getSystemCommand(commandName); cmdType == cmdSystem {
 		var status commandStatus = 1
 		var output commandOutput
+		var errorOutput strings.Builder
 		args := inputs[1:]
 		cmd := exec.Command(cmdPath, args...)
+		cmd.Stderr = &errorOutput
 
-		if cmdOutput, err := cmd.Output(); err != nil {
-			output = err.Error()
-		} else {
+		if cmdOutput, err := cmd.Output(); err == nil {
 			output = string(cmdOutput)
 			status = 0
+		} else {
+			output = errorOutput.String()
 		}
 
 		return output, status
@@ -209,7 +211,6 @@ func handleRedirect(args []string) (commandOutput, commandStatus) {
 
 	if len(args) < 2 {
 		output = fmt.Sprintf("too few arguments for redirect")
-		status = 1
 
 		return output, status
 	}
@@ -231,7 +232,8 @@ func handleRedirect(args []string) (commandOutput, commandStatus) {
 
 	if err != nil {
 		output = err.Error()
-		status = 1
+	} else {
+		status = 0
 	}
 
 	return output, status
