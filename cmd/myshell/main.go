@@ -12,14 +12,31 @@ import (
 )
 
 type (
-	command     func([]string) (commandOutput, commandStatus)
-	commandType int
+	command         func(executionConfig) executionConfig
+	commandType     int
+	compoundCommand func(config executionConfig, prevConfig executionConfig) executionConfig
 )
 
 type (
 	commandOutput = string
 	commandStatus = int
 )
+
+type executionConfig struct {
+	args        []string
+	commandName string
+	status      commandStatus
+	stdErr      string
+	stdOut      string
+}
+
+func newExecutionConfig(commandName string, args []string) executionConfig {
+	return executionConfig{
+		status:      1,
+		args:        args,
+		commandName: commandName,
+	}
+}
 
 const (
 	cmdBuiltin commandType = iota
@@ -45,32 +62,27 @@ func main() {
 }
 
 func handleInput(input string) {
-	var output string
-	var status commandStatus = 1
+	prevExecution := newExecutionConfig("", []string{})
 	args := parseArgs(strings.TrimSpace(input))
 	aggregatedArgs := aggregateArgs(args)
-	fd := os.Stderr
 
 	for _, aggregate := range aggregatedArgs {
-		if len(output) > 0 {
-			aggregate = append(aggregate, output)
-		}
-
 		if len(aggregate) == 0 {
 			continue
 		}
 
 		commandName := strings.TrimSpace(aggregate[0])
-		output, status = executeCommand(commandName, aggregate)
-		output = strings.TrimSpace(output)
-
-		if status > 0 {
-			break
-		}
+		execution := newExecutionConfig(commandName, aggregate)
+		prevExecution = executeCommand(execution, prevExecution)
 	}
+
+	fd := os.Stderr
+	output := strings.TrimSpace(prevExecution.stdErr)
+	status := prevExecution.status
 
 	if status == 0 {
 		fd = os.Stdout
+		output = strings.TrimSpace(prevExecution.stdOut)
 	}
 
 	if len(output) > 0 {
@@ -184,52 +196,56 @@ func parseArgs(input string) []string {
 	return args
 }
 
-func executeCommand(commandName string, inputs []string) (commandOutput, commandStatus) {
-	if compoundCommand, cmdType := getCompoundCommand(commandName); cmdType == cmdCompound {
-		return compoundCommand(inputs)
+func executeCommand(config executionConfig, prevConfig executionConfig) executionConfig {
+	if compoundCommand, cmdType := getCompoundCommand(config.commandName); cmdType == cmdCompound {
+		return compoundCommand(config, prevConfig)
 	}
 
-	if builtinCommand, cmdType := getBuiltinCommand(commandName); cmdType == cmdBuiltin {
-		return builtinCommand(inputs)
+	if builtinCommand, cmdType := getBuiltinCommand(config.commandName); cmdType == cmdBuiltin {
+		return builtinCommand(config)
 	}
 
-	if cmdPath, cmdType := getSystemCommand(commandName); cmdType == cmdSystem {
-		return execSystemCommand(cmdPath, inputs)
+	if cmdPath, cmdType := getSystemCommand(config.commandName); cmdType == cmdSystem {
+		config.commandName = cmdPath
+		return execSystemCommand(config)
 	}
 
-	return handleNotFound(inputs)
+	return handleNotFound(config)
 }
 
-func execSystemCommand(cmdPath string, inputs []string) (commandOutput, commandStatus) {
-	var status commandStatus = 1
-	var output commandOutput
-	args := inputs[1:]
-	cmd := exec.Command(cmdPath, args...)
+func execSystemCommand(config executionConfig) executionConfig {
+	var stdErr strings.Builder
+	cmdPath := config.commandName
+	cmd := exec.Command(cmdPath, config.args[1:]...)
+	cmd.Stderr = &stdErr
 
-	cmdOutput, err := cmd.CombinedOutput()
+	cmdOutput, err := cmd.Output()
 	if err == nil {
-		status = 0
+		config.status = 0
+	} else {
+		config.stdErr = stdErr.String()
 	}
 
-	output = string(cmdOutput)
+	config.stdOut = string(cmdOutput)
 
-	return output, status
+	return config
 }
 
-func handleRedirect(args []string) (commandOutput, commandStatus) {
-	var output commandOutput
+func handleRedirect(config executionConfig, prevConfig executionConfig) executionConfig {
 	var file *os.File
 	var err error
-	status := 1
 
-	if len(args) < 2 {
-		output = fmt.Sprintf("too few arguments for redirect")
+	if len(config.args) < 2 {
+		config.stdOut = fmt.Sprintf("too few arguments for redirect")
 
-		return output, status
+		return config
 	}
 
-	fileName := args[1]
-	fileArgs := args[2:]
+	fileName := config.args[1]
+	fileArgs := []string{}
+
+	copy(fileArgs, config.args[2:])
+	copy(fileArgs, []string{prevConfig.stdOut})
 
 	_, statErr := os.Stat(fileName)
 
@@ -244,17 +260,17 @@ func handleRedirect(args []string) (commandOutput, commandStatus) {
 	}
 
 	if err != nil {
-		output = err.Error()
+		config.stdErr = err.Error()
 	} else {
-		status = 0
+		config.status = 0
 	}
 
-	return output, status
+	return config
 }
 
 // TODO: should return err if commandName is not compound
-func getCompoundCommand(commandName string) (command, commandType) {
-	var cmd command
+func getCompoundCommand(commandName string) (compoundCommand, commandType) {
+	var cmd compoundCommand
 	cmdType := cmdNotFound
 
 	if isRedirect(commandName) {
@@ -304,87 +320,85 @@ func getSystemCommand(commandName string) (string, commandType) {
 	return path, cmdType
 }
 
-func handleExit(args []string) (commandOutput, commandStatus) {
-	var output commandOutput
-	status := 0
+func handleExit(config executionConfig) executionConfig {
+	args := config.args
 
 	if len(args) > 2 {
-		output = fmt.Sprintf("too many arguments")
-		status = 1
+		config.stdErr = fmt.Sprintf("too many arguments")
+
+		return config
 	}
 
 	if len(args) > 1 {
 		arg := args[1]
-		x, err := strconv.Atoi(arg)
-		if err != nil {
-			status = x
-			output = err.Error()
+
+		if x, err := strconv.Atoi(arg); err != nil {
+			config.stdErr = err.Error()
+		} else {
+			config.status = x
 		}
 	}
 
 	// TODO: understand why this doesn't raise compiler errors when followed by
 	// return statement
-	os.Exit(status)
+	os.Exit(config.status)
 
-	return output, status
+	return config
 }
 
-func handleCd(args []string) (commandOutput, commandStatus) {
-	var status commandStatus = 1
+func handleCd(config executionConfig) executionConfig {
+	args := config.args
 	path := strings.TrimSpace(strings.Join(args[1:], ""))
-	output := fmt.Sprintf("cd: %s: No such file or directory", path)
 
 	if path == "~" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			output = err.Error()
+			config.stdErr = err.Error()
 		}
 
 		path = homeDir
 	}
 
 	if err := os.Chdir(path); err == nil {
-		status = 0
-		output = ""
+		config.status = 0
+	} else {
+		config.stdErr = fmt.Sprintf("cd: %s: No such file or directory", path)
 	}
 
-	return output, status
+	return config
 }
 
-func handleEcho(args []string) (commandOutput, commandStatus) {
-	status := 0
-	values := args[1:]
-	output := strings.Join(values, " ")
+func handleEcho(config executionConfig) executionConfig {
+	config.status = 0
+	config.stdOut = strings.Join(config.args[1:], " ")
 
-	return output, commandStatus(status)
+	return config
 }
 
-func handlePwd(args []string) (commandOutput, commandStatus) {
-	var status commandStatus = 1
-	var output commandOutput
+func handlePwd(config executionConfig) executionConfig {
+	args := config.args
 
 	if len(args[1:]) > 2 {
-		output = "too many arguments"
+		config.stdErr = "too many arguments"
 
-		return output, status
+		return config
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		output = err.Error()
+		config.stdErr = err.Error()
 	} else {
-		output = wd
-		status = 0
+		config.stdOut = wd
+		config.status = 0
 	}
 
-	return output, status
+	return config
 }
 
-func handleType(args []string) (commandOutput, commandStatus) {
+func handleType(config executionConfig) executionConfig {
+	args := config.args
 	commands := args[1:]
 	typeByCommand := make(map[string]commandType)
-	var status commandStatus = 1
-	var output commandOutput
 
 	for _, x := range commands {
 		if _, cmdType := getBuiltinCommand(x); cmdType != cmdNotFound {
@@ -399,21 +413,22 @@ func handleType(args []string) (commandOutput, commandStatus) {
 	for cmd, cmdType := range typeByCommand {
 		switch cmdType {
 		case cmdBuiltin:
-			output = fmt.Sprintf("%s is a shell builtin", cmd)
-			status = 0
+			config.stdOut = fmt.Sprintf("%s is a shell builtin", cmd)
+			config.status = 0
 		case cmdSystem:
-			output = fmt.Sprintf("%s is %s", filepath.Base(cmd), cmd)
-			status = 0
+			config.stdOut = fmt.Sprintf("%s is %s", filepath.Base(cmd), cmd)
+			config.status = 0
 		default:
-			output = fmt.Sprintf("%s: not found", cmd)
+			config.stdErr = fmt.Sprintf("%s: not found", cmd)
 		}
 	}
 
-	return output, status
+	return config
 }
 
-func handleNotFound(args []string) (commandOutput, commandStatus) {
-	command := args[0]
+func handleNotFound(config executionConfig) executionConfig {
+	command := config.args[0]
+	config.stdErr = fmt.Sprintf("%s: command not found", command)
 
-	return fmt.Sprintf("%s: command not found", command), 1
+	return config
 }
