@@ -45,13 +45,15 @@ func main() {
 }
 
 func handleInput(input string) {
-	var lastOutput string
+	var output string
+	var status commandStatus = 1
 	args := parseArgs(strings.TrimSpace(input))
 	aggregatedArgs := aggregateArgs(args)
+	fd := os.Stderr
 
-	for i, aggregate := range aggregatedArgs {
-		if len(lastOutput) > 0 {
-			aggregate = append(aggregate, lastOutput)
+	for _, aggregate := range aggregatedArgs {
+		if len(output) > 0 {
+			aggregate = append(aggregate, output)
 		}
 
 		if len(aggregate) == 0 {
@@ -59,18 +61,45 @@ func handleInput(input string) {
 		}
 
 		commandName := strings.TrimSpace(aggregate[0])
-		output, status := executeCommand(commandName, aggregate)
+		output, status = executeCommand(commandName, aggregate)
 		output = strings.TrimSpace(output)
 
-		switch true {
-		case status > 0:
-			fmt.Fprintln(os.Stderr, output)
-		case i == len(aggregatedArgs)-1 && len(output) > 0:
-			fmt.Fprintln(os.Stdout, output)
-		default:
-			lastOutput = output
+		if status > 0 {
+			break
 		}
 	}
+
+	if status == 0 {
+		fd = os.Stdout
+	}
+
+	if len(output) > 0 {
+		fmt.Fprintln(fd, output)
+	}
+}
+
+func isRedirect(x string) bool {
+	return strings.HasSuffix(x, ">")
+}
+
+func aggregateArgs(args []string) [][]string {
+	var aggregates [][]string
+	currAggregate := []string{}
+
+	for i, x := range args {
+		if isRedirect(x) {
+			aggregates = append(aggregates, currAggregate)
+			currAggregate = []string{x}
+		} else {
+			currAggregate = append(currAggregate, x)
+		}
+
+		if i == len(args)-1 {
+			aggregates = append(aggregates, currAggregate)
+		}
+	}
+
+	return aggregates
 }
 
 const (
@@ -155,26 +184,6 @@ func parseArgs(input string) []string {
 	return args
 }
 
-func aggregateArgs(args []string) [][]string {
-	var aggregates [][]string
-	currAggregate := []string{}
-
-	for i, x := range args {
-		if strings.HasSuffix(x, ">") {
-			aggregates = append(aggregates, currAggregate)
-			currAggregate = []string{x}
-		} else {
-			currAggregate = append(currAggregate, x)
-		}
-
-		if i == len(args)-1 {
-			aggregates = append(aggregates, currAggregate)
-		}
-	}
-
-	return aggregates
-}
-
 func executeCommand(commandName string, inputs []string) (commandOutput, commandStatus) {
 	if compoundCommand, cmdType := getCompoundCommand(commandName); cmdType == cmdCompound {
 		return compoundCommand(inputs)
@@ -248,7 +257,7 @@ func getCompoundCommand(commandName string) (command, commandType) {
 	var cmd command
 	cmdType := cmdNotFound
 
-	if strings.HasSuffix(commandName, ">") {
+	if isRedirect(commandName) {
 		cmdType = cmdCompound
 		cmd = handleRedirect
 	}
