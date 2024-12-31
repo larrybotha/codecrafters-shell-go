@@ -233,18 +233,15 @@ func execSystemCommand(config executionConfig) executionConfig {
 }
 
 func handleRedirect(config executionConfig, prevConfig executionConfig) executionConfig {
-	var file *os.File
-	var err error
-
 	if len(config.args) < 2 {
 		config.stdOut = fmt.Sprintf("too few arguments for redirect")
 
 		return config
 	}
 
+	var file *os.File
+	var err error
 	fileName := config.args[1]
-	redirect := config.args[0]
-
 	_, statErr := os.Stat(fileName)
 
 	if os.IsNotExist(statErr) {
@@ -253,13 +250,16 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 		file, err = os.OpenFile(fileName, os.O_WRONLY, 0o644)
 	}
 
+	redirect := config.args[0]
 	fileArgs := []string{}
 
 	switch true {
-	case slices.Contains([]string{"2>"}, redirect) && len(prevConfig.stdErr) > 0:
-		fileArgs = append(fileArgs, prevConfig.stdErr)
-	case slices.Contains([]string{"1>", ">"}, redirect) && len(prevConfig.stdOut) > 0:
-		fileArgs = append(fileArgs, prevConfig.stdOut)
+	case slices.Contains([]string{"2>"}, redirect):
+		fileArgs = []string{prevConfig.stdErr}
+		config.stdOut = prevConfig.stdOut
+	case slices.Contains([]string{"1>", ">"}, redirect):
+		fileArgs = []string{prevConfig.stdOut}
+		config.stdOut = prevConfig.stdErr
 	}
 
 	fileArgs = append(fileArgs, config.args[2:]...)
@@ -276,12 +276,6 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 
 	return config
 }
-
-// func redirectToStdout(config executionConfig, prevConfig executionConfig) executionConfig {
-// }
-//
-// func redirectToStderr(config executionConfig, prevConfig executionConfig) executionConfig {
-// }
 
 // TODO: should return err if commandName is not compound
 func getCompoundCommand(commandName string) (compoundCommand, commandType) {
