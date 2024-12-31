@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -242,12 +243,7 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 	}
 
 	fileName := config.args[1]
-	fileArgs := []string{prevConfig.stdOut}
-	fileArgs = append(fileArgs, config.args[2:]...)
-
-	if len(prevConfig.stdErr) > 0 {
-		fmt.Fprint(os.Stderr, prevConfig.stdErr)
-	}
+	redirect := config.args[0]
 
 	_, statErr := os.Stat(fileName)
 
@@ -256,6 +252,17 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 	} else {
 		file, err = os.OpenFile(fileName, os.O_WRONLY, 0o644)
 	}
+
+	fileArgs := []string{}
+
+	switch true {
+	case slices.Contains([]string{"2>"}, redirect) && len(prevConfig.stdErr) > 0:
+		fileArgs = append(fileArgs, prevConfig.stdErr)
+	case slices.Contains([]string{"1>", ">"}, redirect) && len(prevConfig.stdOut) > 0:
+		fileArgs = append(fileArgs, prevConfig.stdOut)
+	}
+
+	fileArgs = append(fileArgs, config.args[2:]...)
 
 	if file != nil && err == nil {
 		_, err = file.Write([]byte(strings.Join(fileArgs, "")))
@@ -269,6 +276,12 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 
 	return config
 }
+
+// func redirectToStdout(config executionConfig, prevConfig executionConfig) executionConfig {
+// }
+//
+// func redirectToStderr(config executionConfig, prevConfig executionConfig) executionConfig {
+// }
 
 // TODO: should return err if commandName is not compound
 func getCompoundCommand(commandName string) (compoundCommand, commandType) {
