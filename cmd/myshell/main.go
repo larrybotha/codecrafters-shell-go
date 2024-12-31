@@ -187,17 +187,15 @@ func executeCommand(commandName string, inputs []string) (commandOutput, command
 	if cmdPath, cmdType := getSystemCommand(commandName); cmdType == cmdSystem {
 		var status commandStatus = 1
 		var output commandOutput
-		var errorOutput strings.Builder
 		args := inputs[1:]
 		cmd := exec.Command(cmdPath, args...)
-		cmd.Stderr = &errorOutput
 
-		if cmdOutput, err := cmd.Output(); err == nil {
-			output = string(cmdOutput)
+		cmdOutput, err := cmd.CombinedOutput()
+		if err == nil {
 			status = 0
-		} else {
-			output = errorOutput.String()
 		}
+
+		output = string(cmdOutput)
 
 		return output, status
 	}
