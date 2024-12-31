@@ -316,8 +316,8 @@ func handleExit(args []string) (commandOutput, commandStatus) {
 
 func handleCd(args []string) (commandOutput, commandStatus) {
 	var status commandStatus = 1
-	var output commandOutput
 	path := strings.TrimSpace(strings.Join(args[1:], ""))
+	output := fmt.Sprintf("cd: %s: No such file or directory", path)
 
 	if path == "~" {
 		homeDir, err := os.UserHomeDir()
@@ -326,17 +326,11 @@ func handleCd(args []string) (commandOutput, commandStatus) {
 		}
 
 		path = homeDir
-	} else if fileInfo, err := os.Stat(path); err != nil || !fileInfo.IsDir() {
-		output = fmt.Sprintf("cd: %s: No such file or directory", path)
 	}
 
-	err := os.Chdir(path)
-	if err != nil {
-		output = fmt.Sprintf("error: %s", err.Error())
-	}
-
-	if len(output) == 0 {
+	if err := os.Chdir(path); err == nil {
 		status = 0
+		output = ""
 	}
 
 	return output, status
