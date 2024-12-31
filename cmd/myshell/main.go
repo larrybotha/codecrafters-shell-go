@@ -242,10 +242,12 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 	}
 
 	fileName := config.args[1]
-	fileArgs := []string{}
+	fileArgs := []string{prevConfig.stdOut}
+	fileArgs = append(fileArgs, config.args[2:]...)
 
-	copy(fileArgs, config.args[2:])
-	copy(fileArgs, []string{prevConfig.stdOut})
+	if len(prevConfig.stdErr) > 0 {
+		fmt.Fprint(os.Stderr, prevConfig.stdErr)
+	}
 
 	_, statErr := os.Stat(fileName)
 
