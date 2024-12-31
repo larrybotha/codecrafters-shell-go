@@ -60,11 +60,12 @@ func handleInput(input string) {
 
 		commandName := strings.TrimSpace(aggregate[0])
 		output, status := executeCommand(commandName, aggregate)
+		output = strings.TrimSpace(output)
 
 		switch true {
 		case status > 0:
 			fmt.Fprintln(os.Stderr, output)
-		case i == len(aggregatedArgs)-1:
+		case i == len(aggregatedArgs)-1 && len(output) > 0:
 			fmt.Fprintln(os.Stdout, output)
 		default:
 			lastOutput = output
