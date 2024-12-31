@@ -185,22 +185,26 @@ func executeCommand(commandName string, inputs []string) (commandOutput, command
 	}
 
 	if cmdPath, cmdType := getSystemCommand(commandName); cmdType == cmdSystem {
-		var status commandStatus = 1
-		var output commandOutput
-		args := inputs[1:]
-		cmd := exec.Command(cmdPath, args...)
-
-		cmdOutput, err := cmd.CombinedOutput()
-		if err == nil {
-			status = 0
-		}
-
-		output = string(cmdOutput)
-
-		return output, status
+		return execSystemCommand(cmdPath, inputs)
 	}
 
 	return handleNotFound(inputs)
+}
+
+func execSystemCommand(cmdPath string, inputs []string) (commandOutput, commandStatus) {
+	var status commandStatus = 1
+	var output commandOutput
+	args := inputs[1:]
+	cmd := exec.Command(cmdPath, args...)
+
+	cmdOutput, err := cmd.CombinedOutput()
+	if err == nil {
+		status = 0
+	}
+
+	output = string(cmdOutput)
+
+	return output, status
 }
 
 func handleRedirect(args []string) (commandOutput, commandStatus) {
