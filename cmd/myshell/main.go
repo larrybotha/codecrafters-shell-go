@@ -241,12 +241,13 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 
 	var file *os.File
 	var err error
+	var fileSize int64
 	fileName := config.args[1]
 	flag := os.O_WRONLY
 	redirect := config.args[0]
 	fileArgs := []string{}
 	useAppend := strings.HasSuffix(redirect, ">>")
-	_, statErr := os.Stat(fileName)
+	fileInfo, statErr := os.Stat(fileName)
 
 	if useAppend {
 		flag = os.O_APPEND | os.O_WRONLY
@@ -256,23 +257,18 @@ func handleRedirect(config executionConfig, prevConfig executionConfig) executio
 		file, err = os.Create(fileName)
 	} else {
 		file, err = os.OpenFile(fileName, flag, 0o644)
+		fileSize = fileInfo.Size()
 	}
 	defer file.Close()
 
 	switch true {
 	case slices.Contains([]string{"2>", "2>>"}, redirect):
-		suffix := ""
-
-		if useAppend {
-			suffix = "\n"
-		}
-
-		fileArgs = []string{suffix + prevConfig.stdErr}
+		fileArgs = []string{prevConfig.stdErr}
 		config.stdOut = prevConfig.stdOut
 	case slices.Contains([]string{"1>", "1>>", ">", ">>"}, redirect):
 		suffix := ""
 
-		if useAppend {
+		if useAppend && fileSize > 0 {
 			suffix = "\n"
 		}
 
