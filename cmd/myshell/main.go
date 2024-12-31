@@ -188,10 +188,10 @@ func executeCommand(commandName string, inputs []string) (commandOutput, command
 		args := inputs[1:]
 		cmd := exec.Command(cmdPath, args...)
 
-		if xs, err := cmd.Output(); err != nil {
+		if cmdOutput, err := cmd.Output(); err != nil {
 			output = err.Error()
 		} else {
-			output = string(xs)
+			output = string(cmdOutput)
 			status = 0
 		}
 
